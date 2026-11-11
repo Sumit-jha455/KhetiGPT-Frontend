@@ -1,5 +1,5 @@
 // Import React hooks for local state
-import { useState } from "react";
+import { useEffect, useState } from "react";
 // Import the lucide icons used on this page
 import { Settings as SettingsIcon, Bell, Languages, Moon, Info, Save } from "lucide-react";
 // Import the reusable components
@@ -11,10 +11,10 @@ import Disclaimer from "../components/Disclaimer";
 import { useApp } from "../context/AppContext";
 // Import the page title hook
 import { useDocumentTitle } from "../hooks/useDocumentTitle";
+import { useLocalStorage } from "../hooks/useLocalStorage";
 
 /**
- * Settings - demo preferences screen.
- * Preferences are stored in local state only to show the planned interface.
+ * Settings - account-backed language plus local-only interface preferences.
  */
 export default function Settings() {
   // Set the browser tab title for this page
@@ -24,25 +24,38 @@ export default function Settings() {
   const { user, updateProfile } = useApp();
 
   // Local state for each preference toggle
-  const [preferences, setPreferences] = useState({
-    // Notification preference (sample only)
+  const [localPreferences, setLocalPreferences] = useLocalStorage("khetigpt_preferences", {
     notifications: true,
-    // Selected interface language
-    language: user.language || "English",
-    // Compact display preference (sample only)
     compactMode: false,
   });
+  const [language, setLanguage] = useState(user.language || "English");
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+
+  useEffect(() => {
+    setLanguage(user.language || "English");
+  }, [user.language]);
 
   /** Toggles a boolean preference by name */
   const togglePreference = (name) => {
     // Update the preference with the opposite value
-    setPreferences((current) => ({ ...current, [name]: !current[name] }));
+    setLocalPreferences((current) => ({ ...current, [name]: !current[name] }));
   };
 
   /** Saves the language preference into the app context */
-  const handleSave = () => {
-    // Store the selected language in the demo profile
-    updateProfile({ language: preferences.language });
+  const handleSave = async () => {
+    setSaving(true);
+    setMessage("");
+    setErrorMessage("");
+    try {
+      await updateProfile({ language });
+      setMessage("Language preference saved to your profile.");
+    } catch (error) {
+      setErrorMessage(error.response?.data?.message || error.message || "Unable to save language preference.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -62,7 +75,7 @@ export default function Settings() {
         </div>
         {/* Page description */}
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-muted">
-          Interface preferences for the demo. These options are stored locally in this prototype.
+          Language is saved to your profile. Notification and compact display preferences stay on this device.
         </p>
       </div>
 
@@ -75,7 +88,7 @@ export default function Settings() {
             // Title
             title="Notifications"
             // Description
-            description="Sample preference switches for the prototype."
+            description="These preferences are local-only; no backend notification or layout setting exists."
             // Icon
             icon={Bell}
           />
@@ -88,7 +101,7 @@ export default function Settings() {
               <p className="text-sm font-semibold text-ink">Weather updates</p>
               {/* Row description */}
               <p className="mt-0.5 text-xs leading-relaxed text-ink-muted">
-                Show sample notifications in the topbar bell menu.
+                Controls local notification indicators where supported.
               </p>
             </div>
 
@@ -100,12 +113,12 @@ export default function Settings() {
               onClick={() => togglePreference("notifications")}
               // ARIA attributes expose the switch state
               role="switch"
-              aria-checked={preferences.notifications}
+              aria-checked={localPreferences.notifications}
               // Accessible label
               aria-label="Weather update notifications"
               // Track styling that changes colour when active
               className={
-                preferences.notifications
+                localPreferences.notifications
                   ? // Active track
                     "relative h-6 w-11 shrink-0 rounded-full bg-brand-600 transition-colors"
                   : // Inactive track
@@ -116,7 +129,7 @@ export default function Settings() {
               <span
                 // Position depends on the state
                 className={
-                  preferences.notifications
+                  localPreferences.notifications
                     ? // Thumb on the right
                       "absolute right-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-all"
                     : // Thumb on the left
@@ -134,7 +147,7 @@ export default function Settings() {
               <p className="text-sm font-semibold text-ink">Compact display</p>
               {/* Row description */}
               <p className="mt-0.5 text-xs leading-relaxed text-ink-muted">
-                Reduce spacing on small screens (visual only in this demo).
+                Stores your compact display preference locally.
               </p>
             </div>
 
@@ -146,12 +159,12 @@ export default function Settings() {
               onClick={() => togglePreference("compactMode")}
               // ARIA switch semantics
               role="switch"
-              aria-checked={preferences.compactMode}
+              aria-checked={localPreferences.compactMode}
               // Accessible label
               aria-label="Compact display mode"
               // Track styling
               className={
-                preferences.compactMode
+                localPreferences.compactMode
                   ? // Active track
                     "relative h-6 w-11 shrink-0 rounded-full bg-brand-600 transition-colors"
                   : // Inactive track
@@ -162,7 +175,7 @@ export default function Settings() {
               <span
                 // Position depends on the state
                 className={
-                  preferences.compactMode
+                  localPreferences.compactMode
                     ? // Thumb on the right
                       "absolute right-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-all"
                     : // Thumb on the left
@@ -188,22 +201,22 @@ export default function Settings() {
           {/* Language option tiles */}
           <div className="grid grid-cols-2 gap-3">
             {/* Map both language options */}
-            {["English", "Hindi"].map((language) => (
+            {["English", "Hindi"].map((option) => (
               // Single language tile
               <button
                 // Unique key per language
-                key={language}
+                key={option}
                 // Avoid form submission
                 type="button"
                 // Select the language locally
-                onClick={() => setPreferences((current) => ({ ...current, language }))}
+                onClick={() => setLanguage(option)}
                 // ARIA state for the selected option
-                aria-pressed={preferences.language === language}
+                aria-pressed={language === option}
                 // Accessible label
-                aria-label={`Select ${language} language`}
+                aria-label={`Select ${option} language`}
                 // Tile styling that highlights the selected option
                 className={
-                  preferences.language === language
+                  language === option
                     ? // Selected tile
                       "rounded-xl border-2 border-brand-500 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800"
                     : // Unselected tile
@@ -211,7 +224,7 @@ export default function Settings() {
                 }
               >
                 {/* Language label */}
-                {language}
+                {option}
               </button>
             ))}
           </div>
@@ -221,13 +234,16 @@ export default function Settings() {
             {/* Save icon */}
             <Save size={16} aria-hidden="true" />
             {/* Button label */}
-            Save Preference
+            {saving ? "Saving..." : "Save Preference"}
           </Button>
+
+          {message ? <p className="mt-3 text-xs font-medium text-brand-700">{message}</p> : null}
+          {errorMessage ? <p role="alert" className="mt-3 text-xs font-medium text-red-700">{errorMessage}</p> : null}
 
           {/* Note about translation support */}
           <Disclaimer
             // Notice text
-            text="Multi-language interface text is planned for a later phase. Only the preference is stored in this prototype."
+            text="Language is stored on your profile, but translating all interface text is not implemented yet."
             // Spacing above
             className="mt-4"
           />
@@ -280,18 +296,18 @@ export default function Settings() {
             </dt>
             {/* Value */}
             <dd className="mt-1 text-sm font-semibold text-brand-950">
-              Frontend MVP with mock data
+              Connected frontend with backend services
             </dd>
           </div>
-          {/* Planned integrations row */}
+          {/* Connected services row */}
           <div className="rounded-xl bg-surface p-4">
             {/* Label */}
             <dt className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
-              Planned next
+              Connected services
             </dt>
             {/* Value */}
             <dd className="mt-1 text-sm font-semibold text-brand-950">
-              Express API, MongoDB, Gemini and Weather API
+              Express API, MongoDB, Groq and OpenWeather
             </dd>
           </div>
         </dl>

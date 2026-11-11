@@ -15,17 +15,17 @@ const HIGHLIGHTS = [
     // Highlight title
     title: "Weather information",
     // Highlight description
-    description: "Sample current conditions and a five day forecast view",
+    description: "Live current conditions and a five day forecast view",
   },
   {
     icon: Sprout,
     title: "Crop & fertilizer guidance",
-    description: "Rule based demo suggestions from your farm details",
+    description: "Backend guidance based on your farm details",
   },
   {
     icon: ShieldCheck,
-    title: "Demo mode",
-    description: "No real account is created and no data leaves your browser",
+    title: "Secure account access",
+    description: "Your account uses the connected backend authentication service",
   },
 ];
 

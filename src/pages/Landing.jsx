@@ -29,19 +29,19 @@ const FEATURES = [
     title: "AI Farming Assistant",
     // Short description of the feature
     description:
-      "Ask farming related questions in a chat interface and receive guidance from a demo response engine.",
+      "Ask farming related questions in a chat interface and receive connected AI guidance.",
   },
   {
     icon: CloudSun,
     title: "Weather Information",
     description:
-      "View current temperature, humidity, wind speed, rain probability and a five day sample forecast.",
+      "View current temperature, humidity, wind speed, rain probability and a five day forecast.",
   },
   {
     icon: Sprout,
     title: "Crop Recommendation",
     description:
-      "Enter your season, soil type, water availability and farm size to receive a demo crop suggestion.",
+      "Enter your season, soil type, water availability and farm size to receive a backend crop recommendation.",
   },
   {
     icon: Droplets,
@@ -53,7 +53,7 @@ const FEATURES = [
     icon: Landmark,
     title: "Government Schemes",
     description:
-      "Browse a searchable directory of sample scheme records with eligibility and benefit summaries.",
+      "Browse a searchable directory of government scheme records with eligibility and benefit summaries.",
   },
   {
     icon: LayoutDashboard,
@@ -86,7 +86,7 @@ const STEPS = [
   {
     number: "04",
     title: "Get Assistance",
-    description: "Read the generated demo guidance and review the notes provided.",
+    description: "Read the generated guidance and review the notes provided.",
   },
 ];
 
@@ -170,7 +170,7 @@ export default function Landing() {
               {/* Hero action buttons */}
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 {/* Primary action: go to registration */}
-                <Button to="/register" size="lg" title="Create a demo account">
+                <Button to="/register" size="lg" title="Create an account">
                   {/* Button label */}
                   Get Started
                   {/* Arrow icon */}
@@ -196,7 +196,7 @@ export default function Landing() {
 
               {/* Small trust line clarifying the project status */}
               <p className="mt-6 text-xs text-ink-muted">
-                Academic mini project prototype · Currently running with sample data
+                Academic mini project with connected backend services
               </p>
             </div>
 
@@ -208,9 +208,9 @@ export default function Landing() {
                 <div className="flex items-center justify-between border-b border-line pb-4">
                   {/* Mock window title */}
                   <p className="font-display text-sm font-bold text-brand-950">Farm Overview</p>
-                  {/* Sample data pill */}
+                  {/* Connected preview pill */}
                   <span className="rounded-full bg-brand-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-brand-700">
-                    Sample
+                    Preview
                   </span>
                 </div>
 
@@ -273,7 +273,7 @@ export default function Landing() {
                   </span>
                   {/* Mock reply text */}
                   <p className="text-xs leading-relaxed text-brand-100">
-                    For loamy soil in the Rabi season, the sample dataset lists wheat, chickpea and
+                    For loamy soil in the Rabi season, the reference data lists wheat, chickpea and
                     tomato as options.
                   </p>
                 </div>
@@ -283,7 +283,7 @@ export default function Landing() {
               <div className="absolute -bottom-6 -left-6 hidden rounded-2xl border border-line bg-white p-3.5 shadow-lift sm:block">
                 {/* Small accent row showing a crop recommendation */}
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-muted">
-                  Demo Recommendation
+                  Recommendation Preview
                 </p>
                 {/* Accent value */}
                 <p className="mt-1 font-display text-sm font-bold text-brand-700">
@@ -444,13 +444,13 @@ export default function Landing() {
             </h2>
             {/* CTA description */}
             <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-ink-muted sm:text-base">
-              Create a demo profile and try the assistant, weather, crop recommendation, fertilizer
+              Create an account and try the assistant, weather, crop recommendation, fertilizer
               and scheme modules.
             </p>
             {/* CTA button */}
             <div className="mt-7 flex justify-center">
               {/* Primary action navigates to the registration page */}
-              <Button to="/register" size="lg" title="Create a demo account">
+              <Button to="/register" size="lg" title="Create an account">
                 {/* Button label */}
                 Get Started
                 {/* Arrow icon */}
@@ -459,7 +459,7 @@ export default function Landing() {
             </div>
             {/* Small note that no real account is created */}
             <p className="mt-4 text-xs text-ink-muted">
-              Demo mode · No real account is created and no data is sent to a server
+              Secure account access · Connected services use the KhetiGPT backend
             </p>
           </div>
         </div>

@@ -1,7 +1,6 @@
 /**
  * useLocalStorage.js
- * A small state hook that persists its value in localStorage so the demo
- * session and edited profile survive a page refresh.
+ * A small state hook for local-only preferences that should survive a refresh.
  */
 
 // Import the required React hooks

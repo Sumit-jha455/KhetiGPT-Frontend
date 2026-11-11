@@ -1,6 +1,4 @@
-// Import React hooks for state and data loading
-import { useState, useEffect } from "react";
-// Import the lucide icons used on the weather page
+import { useEffect, useState } from "react";
 import {
   CloudSun,
   Cloud,
@@ -13,431 +11,234 @@ import {
   MapPin,
   Thermometer,
   Sunrise,
+  Sunset,
   RefreshCw,
-  Lightbulb,
 } from "lucide-react";
-// Import the reusable card, badge, disclaimer and loading components
 import Card, { CardHeader } from "../components/Card";
-import Badge from "../components/Badge";
 import Button from "../components/Button";
-import Disclaimer from "../components/Disclaimer";
 import LoadingState from "../components/LoadingState";
-// Import the mock weather service layer
-import {
-  fetchCurrentWeather,
-  fetchForecast,
-  fetchLocations,
-  fetchWeatherTips,
-} from "../services/weatherService";
-// Import the date formatter for the forecast labels
+import Disclaimer from "../components/Disclaimer";
+import { fetchWeatherBundle, fetchWeatherStatus } from "../services/weatherService";
 import { formatDayLabel } from "../utils/formatters";
-// Import the page title hook
 import { useDocumentTitle } from "../hooks/useDocumentTitle";
+import { useApp } from "../context/AppContext";
 
-// Maps the icon key stored in the data to a lucide icon component
 const ICON_MAP = {
-  // Partly cloudy icon
   "cloud-sun": CloudSun,
-  // Sunny icon
   sun: Sun,
-  // Rain icon
-  "cloud-rain": CloudRain,
-  // Thunderstorm icon
-  "cloud-lightning": CloudLightning,
-  // Cloudy icon
   cloud: Cloud,
+  "cloud-rain": CloudRain,
+  "cloud-lightning": CloudLightning,
 };
 
-/**
- * Weather - the mock weather dashboard.
- * Shows current conditions, key metrics and a five day sample forecast for
- * the selected location. No external weather API is called.
- */
+const getIcon = (key) => ICON_MAP[key] || CloudSun;
+const displayTemperature = (value) =>
+  Number.isFinite(Number(value)) ? `${value}°C` : "—";
+
 export default function Weather() {
-  // Set the browser tab title for this page
   useDocumentTitle("Weather Information");
 
-  // Currently selected location from the dropdown
-  const [location, setLocation] = useState(fetchLocations()[0]);
-  // Current conditions object returned by the mock service
+  const { user } = useApp();
+  const [city, setCity] = useState(user.location || "");
   const [current, setCurrent] = useState(null);
-  // Five day forecast array returned by the mock service
   const [forecast, setForecast] = useState([]);
-  // Loading flag shown while the mock data is being "fetched"
+  const [locationLabel, setLocationLabel] = useState("");
   const [loading, setLoading] = useState(true);
-  // Counter that changes when the user presses Refresh so the effect re-runs
-  const [refreshKey, setRefreshKey] = useState(0);
-  // Farming tips linked to the forecast
-  const tips = fetchWeatherTips();
+  const [errorMessage, setErrorMessage] = useState("");
+  const [configured, setConfigured] = useState(true);
 
-  // Load the mock weather data when the location or the refresh counter changes
-  useEffect(() => {
-    // Track whether this effect run is still valid
-    let active = true;
-    // Show the loading state before fetching
+  const loadWeather = async (requestedCity = city) => {
+    const trimmedCity = String(requestedCity || "").trim();
     setLoading(true);
+    setErrorMessage("");
 
-    /** Loads the current conditions and forecast in parallel */
-    const loadData = async () => {
-      // Request the current conditions for the selected location
-      const currentData = await fetchCurrentWeather(location);
-      // Request the five day forecast
-      const forecastData = await fetchForecast();
-      // Ignore the result if the location changed while loading
-      if (!active) return;
-      // Store the current conditions in state
-      setCurrent(currentData);
-      // Store the forecast in state
-      setForecast(forecastData);
-      // Hide the loading state
+    try {
+      const bundle = await fetchWeatherBundle(trimmedCity);
+      setCurrent(bundle.weather || null);
+      setForecast(Array.isArray(bundle.forecast) ? bundle.forecast : []);
+      setLocationLabel(bundle.location || bundle.weather?.location || trimmedCity);
+    } catch (error) {
+      setCurrent(null);
+      setForecast([]);
+      setErrorMessage(
+        error.response?.data?.message ||
+          error.message ||
+          "Unable to load weather information."
+      );
+    } finally {
       setLoading(false);
-    };
+    }
+  };
 
-    // Run the loader function
-    loadData();
-    // Cleanup marks the effect as inactive on unmount or dependency change
+  useEffect(() => {
+    if (!city && user.location) {
+      setCity(user.location);
+      loadWeather(user.location);
+    }
+  }, [user.location, city]);
+
+  useEffect(() => {
+    if (city.trim()) loadWeather(city);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    fetchWeatherStatus()
+      .then((status) => {
+        if (active) setConfigured(status.configured !== false);
+      })
+      .catch(() => {
+        if (active) setConfigured(false);
+      });
     return () => {
       active = false;
     };
-    // Re-run whenever the location or the refresh counter changes
-  }, [location, refreshKey]);
+  }, []);
+
+  const CurrentIcon = getIcon(current?.icon);
 
   return (
-    // Fragment so the header and content can be returned together
     <>
-      {/* Page header block */}
       <div className="mb-6">
-        {/* Title row with the module icon */}
         <div className="flex items-center gap-3">
-          {/* Icon tile */}
           <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-soft text-sky-deep">
-            {/* Weather icon */}
             <CloudSun size={22} aria-hidden="true" />
           </span>
-          {/* Page title */}
           <h1 className="font-display text-xl font-bold text-brand-950 sm:text-2xl">
             Weather Information
           </h1>
         </div>
-        {/* Page description */}
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-muted">
-          Check current conditions and a five day sample forecast for your area. Weather API
-          integration is planned for a later phase of the project.
+          View current OpenWeather conditions and a five-day forecast for your area.
         </p>
       </div>
 
-      {/* Location selector and refresh row */}
       <Card className="mb-6">
-        {/* Flex row that stacks on small screens */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          {/* Location dropdown */}
+        <form
+          className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"
+          onSubmit={(event) => {
+            event.preventDefault();
+            loadWeather(city);
+          }}
+        >
           <div className="w-full sm:max-w-sm">
-            {/* Field label */}
-            <label
-              // Linked to the select element below
-              htmlFor="weather-location"
-              // Label styling
-              className="mb-1.5 block text-sm font-semibold text-ink"
-            >
-              {/* Label text with an inline pin icon */}
+            <label htmlFor="weather-city" className="mb-1.5 block text-sm font-semibold text-ink">
               <MapPin size={14} className="mr-1.5 inline" aria-hidden="true" />
-              Select Location
+              City
             </label>
-
-            {/* Native select for the location */}
-            <div className="relative">
-              {/* Select element bound to the location state */}
-              <select
-                // Id connected to the label
-                id="weather-location"
-                // Current value
-                value={location}
-                // Update the location state on change
-                onChange={(event) => setLocation(event.target.value)}
-                // Styled select with a native appearance
-                className="h-11 w-full appearance-none rounded-xl border border-line bg-white px-3.5 pr-10 text-sm font-medium text-ink outline-none transition-colors focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
-              >
-                {/* Map every available location into an option */}
-                {fetchLocations().map((option) => (
-                  // Single option element
-                  <option key={option} value={option}>
-                    {/* Option label */}
-                    {option}
-                  </option>
-                ))}
-              </select>
-              {/* Decorative chevron shown on the right of the select */}
-              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted">
-                {/* Chevron down icon */}
-                <ChevronDown size={18} aria-hidden="true" />
-              </span>
-            </div>
+            <input
+              id="weather-city"
+              value={city}
+              onChange={(event) => setCity(event.target.value)}
+              placeholder="e.g. Delhi or Nashik, Maharashtra"
+              className="h-11 w-full rounded-xl border border-line bg-white px-3.5 text-sm text-ink outline-none transition-colors focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+            />
           </div>
-
-          {/* Refresh button that reloads the same mock data */}
-          <Button
-            // Outline variant keeps the action secondary
-            variant="outline"
-            // Small size for the utility row
-            size="sm"
-            // Increase the refresh counter so the data effect runs again
-            onClick={() => setRefreshKey((key) => key + 1)}
-            // Tooltip text
-            title="Refresh sample data"
-          >
-            {/* Refresh icon */}
+          <Button type="submit" variant="outline" size="sm" disabled={loading || !city.trim()}>
             <RefreshCw size={16} aria-hidden="true" />
-            {/* Button label */}
-            Refresh
+            {loading ? "Loading..." : "Refresh"}
           </Button>
-        </div>
-
-        {/* Sample data disclaimer under the selector */}
-        <Disclaimer
-          // Notice text
-          text="Sample data: the values below are hardcoded demo values, not live weather readings."
-          // Amber tone marks it as a warning
-          tone="amber"
-          // Spacing above the notice
-          className="mt-4"
-        />
+        </form>
+        <p className="mt-3 text-xs text-ink-muted">
+          {locationLabel ? `Showing weather for ${locationLabel}.` : "Use a city name to load weather."}
+        </p>
+        {!configured ? (
+          <Disclaimer
+            className="mt-4"
+            tone="amber"
+            text="The weather service is not configured on the backend."
+          />
+        ) : null}
       </Card>
 
-      {/* Loading state or weather content */}
       {loading ? (
-        // Skeleton shown while the mock request resolves
         <Card>
-          {/* Loading indicator with three skeleton rows */}
-          <LoadingState label="Loading sample weather data…" rows={3} />
+          <LoadingState label="Loading live weather..." rows={4} />
+        </Card>
+      ) : errorMessage ? (
+        <Card>
+          <p role="alert" className="rounded-xl border border-red-100 bg-red-50 px-3.5 py-2.5 text-sm leading-relaxed text-red-700">
+            {errorMessage}
+          </p>
+          <Button className="mt-4" onClick={() => loadWeather(city)} disabled={!city.trim()}>
+            Try again
+          </Button>
+        </Card>
+      ) : !current ? (
+        <Card>
+          <p className="text-sm text-ink-muted">No current weather data is available.</p>
         </Card>
       ) : (
-        // Fragment holding the loaded content
         <>
-          {/* Current weather and metrics grid */}
           <div className="grid gap-6 lg:grid-cols-3">
-            {/* Current conditions card */}
-            <Card className="border-brand-200 bg-brand-950 lg:col-span-1">
-              {/* Location label */}
-              <p className="text-xs font-semibold uppercase tracking-wider text-brand-300">
-                {/* Current conditions heading */}
-                Current Weather
-              </p>
-
-              {/* Location name row */}
-              <div className="mt-2 flex items-center gap-2">
-                {/* Pin icon */}
-                <MapPin size={15} className="text-brand-300" aria-hidden="true" />
-                {/* Location text */}
-                <p className="text-sm font-semibold text-white">{current.location}</p>
-              </div>
-
-              {/* Temperature and icon row */}
-              <div className="mt-5 flex items-center justify-between">
-                {/* Left side: temperature values */}
+            <Card className="border-brand-200 bg-brand-950 text-white">
+              <div className="flex items-start justify-between">
                 <div>
-                  {/* Main temperature */}
-                  <p className="font-display text-5xl font-extrabold leading-none text-white">
-                    {/* Sample temperature */}
-                    {current.temperature}°C
+                  <p className="text-sm text-brand-200">{current.location}</p>
+                  <p className="mt-3 font-display text-5xl font-extrabold">
+                    {displayTemperature(current.temperature)}
                   </p>
-                  {/* Condition label */}
-                  <p className="mt-2 text-sm font-semibold text-brand-200">
-                    {current.condition}
-                  </p>
-                  {/* Feels like value */}
-                  <p className="mt-0.5 text-xs text-brand-300/80">
-                    Feels like {current.feelsLike}°C
+                  <p className="mt-2 text-sm font-medium capitalize text-brand-100">
+                    {current.condition} · {current.description}
                   </p>
                 </div>
-                {/* Right side: large weather icon */}
-                <CloudSun size={56} className="text-brand-300" aria-hidden="true" />
+                <CurrentIcon size={50} className="text-brand-200" aria-hidden="true" />
               </div>
-
-              {/* Update time and UV index badges */}
-              <div className="mt-6 flex flex-wrap gap-2">
-                {/* Sample data badge */}
-                <Badge tone="brand" className="border-brand-700 bg-brand-900 text-brand-200">
-                  Sample
-                </Badge>
-                {/* UV index badge */}
-                <Badge tone="brand" className="border-brand-700 bg-brand-900 text-brand-200">
-                  UV: {current.uvIndex}
-                </Badge>
-                {/* Sunrise badge */}
-                <Badge tone="brand" className="border-brand-700 bg-brand-900 text-brand-200">
-                  <Sunrise size={11} aria-hidden="true" /> {current.sunrise}
-                </Badge>
+              <div className="mt-6 grid grid-cols-2 gap-3 text-sm">
+                <span>Feels like <strong>{displayTemperature(current.feelsLike)}</strong></span>
+                <span>Humidity <strong>{current.humidity}%</strong></span>
+                <span>Wind <strong>{current.windSpeed} km/h</strong></span>
+                <span>Rain <strong>{current.rainProbability}%</strong></span>
               </div>
-
-              {/* Updated timestamp */}
-              <p className="mt-4 text-[11px] text-brand-300/70">Updated: {current.updatedAt}</p>
             </Card>
 
-            {/* Metric tiles grid */}
-            <div className="grid gap-4 sm:grid-cols-3 lg:col-span-2 lg:grid-cols-3">
-              {/* Humidity tile */}
-              <Card>
-                {/* Icon tile */}
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-soft text-sky-deep">
-                  {/* Droplets icon */}
-                  <Droplets size={20} aria-hidden="true" />
-                </span>
-                {/* Metric label */}
-                <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-ink-muted">
-                  Humidity
-                </p>
-                {/* Metric value */}
-                <p className="mt-1 font-display text-2xl font-bold text-brand-950">
-                  {current.humidity}%
-                </p>
-                {/* Supporting text */}
-                <p className="mt-1.5 text-xs text-ink-muted">Relative humidity</p>
-              </Card>
-
-              {/* Wind speed tile */}
-              <Card>
-                {/* Icon tile */}
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-soft text-sky-deep">
-                  {/* Wind icon */}
-                  <Wind size={20} aria-hidden="true" />
-                </span>
-                {/* Metric label */}
-                <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-ink-muted">
-                  Wind Speed
-                </p>
-                {/* Metric value */}
-                <p className="mt-1 font-display text-2xl font-bold text-brand-950">
-                  {current.windSpeed} km/h
-                </p>
-                {/* Supporting text */}
-                <p className="mt-1.5 text-xs text-ink-muted">Average wind speed</p>
-              </Card>
-
-              {/* Rain probability tile */}
-              <Card>
-                {/* Icon tile */}
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-soft text-sky-deep">
-                  {/* Umbrella icon */}
-                  <Umbrella size={20} aria-hidden="true" />
-                </span>
-                {/* Metric label */}
-                <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-ink-muted">
-                  Rain Probability
-                </p>
-                {/* Metric value */}
-                <p className="mt-1 font-display text-2xl font-bold text-brand-950">
-                  {current.rainProbability}%
-                </p>
-                {/* Supporting text */}
-                <p className="mt-1.5 text-xs text-ink-muted">Chance of rain today</p>
-              </Card>
-
-              {/* Weather tips card spanning the full row */}
-              <Card className="sm:col-span-3">
-                {/* Card header */}
-                <CardHeader
-                  // Title
-                  title="Farming Considerations"
-                  // Description
-                  description="General points based on the sample forecast."
-                  // Icon
-                  icon={Lightbulb}
-                />
-
-                {/* List of tips */}
-                <ul className="space-y-2.5">
-                  {/* Map every tip into a list item */}
-                  {tips.map((tip) => (
-                    // Single tip row
-                    <li key={tip} className="flex items-start gap-2.5">
-                      {/* Small green dot marker */}
-                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-500" />
-                      {/* Tip text */}
-                      <span className="text-sm leading-relaxed text-ink-soft">{tip}</span>
-                    </li>
-                  ))}
-                </ul>
-              </Card>
-            </div>
+            <Card className="lg:col-span-2">
+              <CardHeader title="Current Conditions" description="Live data from OpenWeather." icon={Thermometer} />
+              <dl className="grid gap-4 sm:grid-cols-2">
+                <div className="flex items-center justify-between rounded-xl bg-surface p-3">
+                  <dt className="text-sm text-ink-muted"><Droplets size={15} className="mr-1 inline" />Humidity</dt>
+                  <dd className="font-semibold text-brand-950">{current.humidity ?? "—"}%</dd>
+                </div>
+                <div className="flex items-center justify-between rounded-xl bg-surface p-3">
+                  <dt className="text-sm text-ink-muted"><Wind size={15} className="mr-1 inline" />Wind speed</dt>
+                  <dd className="font-semibold text-brand-950">{current.windSpeed ?? "—"} km/h</dd>
+                </div>
+                <div className="flex items-center justify-between rounded-xl bg-surface p-3">
+                  <dt className="text-sm text-ink-muted"><Umbrella size={15} className="mr-1 inline" />Rain probability</dt>
+                  <dd className="font-semibold text-brand-950">{current.rainProbability ?? "—"}%</dd>
+                </div>
+                <div className="flex items-center justify-between rounded-xl bg-surface p-3">
+                  <dt className="text-sm text-ink-muted"><Sunrise size={15} className="mr-1 inline" />Sunrise / Sunset</dt>
+                  <dd className="font-semibold text-brand-950">{current.sunrise || "—"} / {current.sunset || "—"}</dd>
+                </div>
+              </dl>
+            </Card>
           </div>
 
-          {/* Five day forecast section */}
-          <h2 className="mb-3 mt-8 text-base font-semibold text-brand-950">5-Day Forecast</h2>
-
-          {/* Forecast grid: horizontally scrollable on very small screens */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-            {/* Map every forecast day into a card */}
-            {forecast.map((day) => {
-              // Resolve the icon component for this day
-              const DayIcon = ICON_MAP[day.icon] || CloudSun;
-              // Return one forecast card
-              return (
-                // Single forecast day card
-                <Card key={day.date} className="text-center">
-                  {/* Day label */}
-                  <p className="text-sm font-semibold text-brand-950">
-                    {formatDayLabel(day.date)}
-                  </p>
-                  {/* Weather icon */}
-                  <DayIcon
-                    size={34}
-                    className="mx-auto mt-3 text-sky-deep"
-                    aria-hidden="true"
-                  />
-                  {/* Condition label */}
-                  <p className="mt-2 text-xs font-medium text-ink-muted">{day.condition}</p>
-
-                  {/* Temperature range row */}
-                  <p className="mt-3 flex items-center justify-center gap-1.5 font-display text-lg font-bold text-brand-950">
-                    {/* High temperature */}
-                    <span className="flex items-center gap-1">
-                      {/* Thermometer icon */}
-                      <Thermometer size={14} className="text-brand-600" aria-hidden="true" />
-                      {/* High value */}
-                      {day.high}°
-                    </span>
-                    {/* Divider */}
-                    <span className="text-ink-muted">/</span>
-                    {/* Low temperature */}
-                    <span className="text-ink-muted">{day.low}°</span>
-                  </p>
-
-                  {/* Metric list */}
-                  <dl className="mt-4 space-y-1.5 border-t border-line pt-3 text-xs">
-                    {/* Rain probability row */}
-                    <div className="flex items-center justify-between">
-                      {/* Label */}
-                      <dt className="text-ink-muted">Rain</dt>
-                      {/* Value */}
-                      <dd className="font-semibold text-brand-950">{day.rain}%</dd>
+          <Card className="mt-6">
+            <CardHeader title="Five-Day Forecast" description="Daily values aggregated by the backend." icon={CloudSun} />
+            {forecast.length === 0 ? (
+              <p className="text-sm text-ink-muted">No forecast data is available for this location.</p>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                {forecast.slice(0, 5).map((day) => {
+                  const DayIcon = getIcon(day.icon);
+                  return (
+                    <div key={day.date} className="rounded-xl border border-line bg-surface p-3">
+                      <p className="text-xs font-semibold text-ink-muted">{formatDayLabel(day.date)}</p>
+                      <DayIcon size={28} className="my-3 text-sky-deep" aria-hidden="true" />
+                      <p className="text-sm font-semibold text-brand-950">{day.condition}</p>
+                      <p className="mt-1 text-sm text-ink-soft">{day.high}° / {day.low}°C</p>
+                      <p className="mt-2 text-xs text-ink-muted">Rain {day.rain}%</p>
                     </div>
-                    {/* Humidity row */}
-                    <div className="flex items-center justify-between">
-                      {/* Label */}
-                      <dt className="text-ink-muted">Humidity</dt>
-                      {/* Value */}
-                      <dd className="font-semibold text-brand-950">{day.humidity}%</dd>
-                    </div>
-                    {/* Wind row */}
-                    <div className="flex items-center justify-between">
-                      {/* Label */}
-                      <dt className="text-ink-muted">Wind</dt>
-                      {/* Value */}
-                      <dd className="font-semibold text-brand-950">{day.wind} km/h</dd>
-                    </div>
-                  </dl>
-                </Card>
-              );
-            })}
-          </div>
-
-          {/* Closing disclaimer about the forecast */}
-          <Disclaimer
-            // Notice text
-            text="The forecast above is a static sample dataset created for this project. Real weather data will be added when the Weather API integration is implemented on the server."
-            // Spacing above the notice
-            className="mt-6"
-          />
+                  );
+                })}
+              </div>
+            )}
+          </Card>
+          <p className="mt-4 text-xs text-ink-muted">
+            Weather data is provided by OpenWeather. Use it as general planning information and verify local field conditions.
+          </p>
         </>
       )}
     </>

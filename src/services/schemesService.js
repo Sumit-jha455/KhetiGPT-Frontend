@@ -1,28 +1,21 @@
-/**
- * schemesService.js
- * Mock service for the government schemes directory. Search and filtering
- * happen locally so the page stays fast and fully offline.
- */
+import api, { ENDPOINTS } from "./api";
 
-// Import the sample scheme records and the local filter helper
-import { SCHEMES, filterSchemes, SCHEME_CATEGORIES } from "../data/mockSchemes";
-// Import the shared delay helper to simulate an API call
-import { simulateNetworkDelay } from "./api";
+const unwrap = (response) => ({
+  data: response.data?.data ?? {},
+  meta: response.data?.meta ?? null,
+});
 
-/**
- * fetchSchemes - resolves with the filtered sample scheme list.
- * @param {string} searchText - text typed into the search box
- * @param {string} category - selected category chip
- */
-export async function fetchSchemes(searchText = "", category = "All") {
-  // Simulate network latency for a realistic loading state
-  await simulateNetworkDelay(400);
-  // Apply the search text and category filter locally
-  return filterSchemes(SCHEMES, searchText, category);
+export async function getSchemes(params = {}) {
+  const response = await api.get(ENDPOINTS.SCHEMES, { params });
+  return unwrap(response);
 }
 
-/** Returns the available category filter options (synchronous) */
-export function fetchCategories() {
-  // Static list, no delay needed
-  return SCHEME_CATEGORIES;
+export async function getSchemesMeta() {
+  const response = await api.get(`${ENDPOINTS.SCHEMES}/meta`);
+  return response.data?.data ?? {};
+}
+
+export async function getSchemeById(id) {
+  const response = await api.get(`${ENDPOINTS.SCHEMES}/${encodeURIComponent(id)}`);
+  return response.data?.data?.scheme ?? null;
 }

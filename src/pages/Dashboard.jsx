@@ -1,5 +1,5 @@
+import { useEffect, useState } from "react";
 // Import the Link component for the assistant call to action
-import { Link } from "react-router-dom";
 // Import the lucide icons used on the dashboard
 import {
   MessageSquareText,
@@ -10,7 +10,6 @@ import {
   ArrowRight,
   Ruler,
   Layers,
-  ClipboardList,
   Sparkles,
   Bot,
   Wind,
@@ -23,10 +22,9 @@ import Button from "../components/Button";
 import Disclaimer from "../components/Disclaimer";
 import StatCard from "../components/StatCard";
 import ServiceCard from "../components/ServiceCard";
-// Import the mock weather data for the summary card
-import { CURRENT_WEATHER, WEATHER_TIPS } from "../data/mockWeather";
-// Import the quick services and sample activity data
-import { QUICK_SERVICES, RECENT_ACTIVITY, FARM_TASKS } from "../data/farmProfile";
+import { fetchCurrentWeather } from "../services/weatherService";
+// Import the quick services shown on the dashboard
+import { QUICK_SERVICES } from "../data/farmProfile";
 // Import the global app context for the farmer and farm details
 import { useApp } from "../context/AppContext";
 // Import the greeting and date formatters
@@ -55,8 +53,35 @@ export default function Dashboard() {
   // Set the browser tab title for this page
   useDocumentTitle("Dashboard");
 
-  // Read the demo farmer and farm information from context
+  // Read the authenticated farmer and saved farm information from context
   const { user, farm } = useApp();
+  const [weather, setWeather] = useState(null);
+  const [weatherError, setWeatherError] = useState("");
+  const [weatherLoading, setWeatherLoading] = useState(false);
+  const [weatherRetryKey, setWeatherRetryKey] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    const loadWeather = async () => {
+      if (!user?.location) return;
+      setWeatherLoading(true);
+      setWeatherError("");
+      try {
+        const data = await fetchCurrentWeather(user.location);
+        if (active) setWeather(data);
+      } catch (error) {
+        if (active) {
+          setWeatherError(error.response?.data?.message || error.message || "Weather unavailable.");
+        }
+      } finally {
+        if (active) setWeatherLoading(false);
+      }
+    };
+    loadWeather();
+    return () => {
+      active = false;
+    };
+  }, [user?.location, weatherRetryKey]);
 
   return (
     // Fragment so multiple sections can be returned
@@ -71,14 +96,14 @@ export default function Dashboard() {
         {/* Today's date under the greeting */}
         <p className="mt-1.5 text-sm text-ink-muted">
           {/* Long formatted date */}
-          {formatLongDate()} · Here is a summary of your demo farm.
+          {formatLongDate()} ·           Here is a summary of your farm.
         </p>
       </div>
 
-      {/* Sample data disclaimer shown once at the top of the dashboard */}
+      {/* Clarify that non-weather dashboard guidance is static. */}
       <Disclaimer
         // Notice text
-        text="All values on this page are sample data created for the academic demonstration of KhetiGPT. No live user or farm data is used."
+        text="Weather is live from the backend. Crop and task guidance on this dashboard is general information; verify conditions locally."
         // Blue informational tone
         tone="sky"
         // Bottom margin for spacing
@@ -92,7 +117,7 @@ export default function Dashboard() {
           // Card title
           title="Farm Overview"
           // Helper description
-          description="Details from your demo farm profile."
+          description="Details from your saved profile."
           // Icon shown in the tile
           icon={Layers}
           // Action link to the profile page
@@ -112,29 +137,29 @@ export default function Dashboard() {
             // Tile label
             label="Farm Size"
             // Tile value built from the farm state
-            value={`${farm.farmSize} ${farm.farmUnit}`}
+            value={farm.farmSize !== "" && farm.farmSize != null ? `${farm.farmSize} ${farm.farmUnit}` : "Not set"}
             // Icon for the tile
             icon={Ruler}
             // Supporting text
-            hint="Registered plot area"
+            hint="Saved plot area"
           />
           {/* Location tile */}
           <StatCard
             // Tile label
             label="Location"
             // Tile value
-            value={user.location}
+            value={user.location || "Not set"}
             // Icon
             icon={MapPin}
             // Supporting text
-            hint="Used for sample weather data"
+            hint="Used for live weather"
           />
           {/* Soil type tile */}
           <StatCard
             // Tile label
             label="Soil Type"
             // Tile value
-            value={farm.soilType}
+            value={farm.soilType || "Not set"}
             // Icon
             icon={Layers}
             // Supporting text
@@ -145,11 +170,11 @@ export default function Dashboard() {
             // Tile label
             label="Current Crop"
             // Tile value
-            value={farm.currentCrop}
+            value={farm.currentCrop || "Not set"}
             // Icon
             icon={Sprout}
             // Supporting text
-            hint={`${farm.season} season`}
+            hint={farm.season ? `${farm.season} season` : "Season not set"}
           />
         </div>
       </Card>
@@ -203,14 +228,14 @@ export default function Dashboard() {
                   {/* CTA description */}
                   <p className="mt-1 text-sm leading-relaxed text-brand-200/80">
                     Get quick answers about crops, soil, fertilizer, weather and scheme records
-                    using the local demo response engine.
+                    using the connected AI assistant.
                   </p>
-                  {/* Demo mode badge */}
+                  {/* Connection badge */}
                   <span className="mt-2 inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-brand-200">
                     {/* Sparkles icon */}
                     <Sparkles size={12} aria-hidden="true" />
                     {/* Badge label */}
-                    Demo AI Mode
+                    Connected AI
                   </span>
                 </div>
               </div>
@@ -235,44 +260,15 @@ export default function Dashboard() {
             </div>
           </Card>
 
-          {/* Recent activity list */}
           <Card className="mt-6">
-            {/* Card header */}
             <CardHeader
-              // Title
               title="Recent Activity"
-              // Description
-              description="Sample activity entries for demonstration."
-              // Icon
-              icon={ClipboardList}
+              description="No activity history is available yet."
+              icon={Layers}
             />
-
-            {/* Vertical list of activity rows */}
-            <ul className="divide-y divide-line">
-              {/* Map the sample activity data into rows */}
-              {RECENT_ACTIVITY.map((activity) => (
-                // Single activity row rendered as a link
-                <li key={activity.title}>
-                  {/* Router link styled as a row */}
-                  <Link
-                    // Destination route
-                    to={activity.to}
-                    // Row styling with a hover background
-                    className="flex items-center justify-between gap-3 py-3 transition-colors hover:text-brand-700"
-                  >
-                    {/* Left side: title and time */}
-                    <div className="min-w-0">
-                      {/* Activity title */}
-                      <p className="truncate text-sm font-medium text-ink">{activity.title}</p>
-                      {/* Activity time */}
-                      <p className="text-xs text-ink-muted">{activity.time}</p>
-                    </div>
-                    {/* Arrow icon on the right */}
-                    <ArrowRight size={16} className="shrink-0 text-ink-muted" aria-hidden="true" />
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            <p className="text-sm leading-relaxed text-ink-muted">
+              Recommendations, fertilizer guidance, scheme views, and farm tasks are not stored as dashboard activity.
+            </p>
           </Card>
         </div>
 
@@ -285,7 +281,7 @@ export default function Dashboard() {
               // Title
               title="Weather Summary"
               // Description
-              description="Sample reading for your location."
+              description={weather?.location || user?.location || "Your saved location"}
               // Icon
               icon={CloudSun}
               // Link to the full weather page
@@ -304,12 +300,17 @@ export default function Dashboard() {
               <div>
                 {/* Large temperature value */}
                 <p className="font-display text-4xl font-extrabold text-brand-950">
-                  {/* Sample temperature */}
-                  {CURRENT_WEATHER.temperature}°C
+                  {Number.isFinite(Number(weather?.temperature))
+                    ? `${weather.temperature}°C`
+                    : weatherError
+                      ? "Unavailable"
+                      : weatherLoading
+                        ? "Loading..."
+                        : "Not available"}
                 </p>
                 {/* Condition label */}
                 <p className="mt-1 text-sm font-medium text-ink-soft">
-                  {CURRENT_WEATHER.condition}
+                  {weather?.condition || (weatherError ? "Weather unavailable" : "Loading live weather")}
                 </p>
               </div>
               {/* Right side: weather icon */}
@@ -323,7 +324,7 @@ export default function Dashboard() {
                 {/* Metric label */}
                 <dt className="text-ink-muted">Humidity</dt>
                 {/* Metric value */}
-                <dd className="font-semibold text-brand-950">{CURRENT_WEATHER.humidity}%</dd>
+                <dd className="font-semibold text-brand-950">{weather?.humidity ?? "—"}%</dd>
               </div>
               {/* Wind speed row */}
               <div className="flex items-center justify-between">
@@ -335,7 +336,7 @@ export default function Dashboard() {
                 </dt>
                 {/* Metric value */}
                 <dd className="font-semibold text-brand-950">
-                  {CURRENT_WEATHER.windSpeed} km/h
+                  {weather?.windSpeed ?? "—"} km/h
                 </dd>
               </div>
               {/* Rain probability row */}
@@ -348,18 +349,24 @@ export default function Dashboard() {
                 </dt>
                 {/* Metric value */}
                 <dd className="font-semibold text-brand-950">
-                  {CURRENT_WEATHER.rainProbability}%
+                  {weather?.rainProbability ?? "—"}%
                 </dd>
               </div>
             </dl>
 
-            {/* Sample weather tip */}
             <p className="mt-4 rounded-xl bg-surface p-3 text-xs leading-relaxed text-ink-soft">
               {/* Tip icon plus text */}
               <Sparkles size={13} className="mr-1.5 inline text-brand-600" aria-hidden="true" />
-              {/* First tip from the sample data */}
-              {WEATHER_TIPS[0]}
+              Weather conditions can change quickly. Confirm local observations before making field decisions.
             </p>
+            {weatherError ? (
+              <div className="mt-3">
+                <p role="alert" className="text-xs text-red-700">{weatherError}</p>
+                <Button className="mt-2" size="sm" variant="outline" onClick={() => setWeatherRetryKey((key) => key + 1)}>
+                  Retry weather
+                </Button>
+              </div>
+            ) : null}
           </Card>
 
           {/* Current crop card */}
@@ -369,7 +376,7 @@ export default function Dashboard() {
               // Title
               title="Current Crop"
               // Description
-              description="Crop recorded in your demo profile."
+              description="Crop and conditions from your saved profile."
               // Icon
               icon={Sprout}
             />
@@ -378,10 +385,10 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               {/* Crop name */}
               <p className="font-display text-xl font-bold text-brand-950">
-                {farm.currentCrop}
+                {farm.currentCrop || "No crop recorded"}
               </p>
               {/* Season badge */}
-              <Badge tone="amber">{farm.season} Season</Badge>
+              {farm.season ? <Badge tone="amber">{farm.season} Season</Badge> : <Badge tone="neutral">Season not set</Badge>}
             </div>
 
             {/* Crop detail rows */}
@@ -391,21 +398,14 @@ export default function Dashboard() {
                 {/* Label */}
                 <dt className="text-ink-muted">Water Availability</dt>
                 {/* Value */}
-                <dd className="font-semibold text-brand-950">{farm.waterAvailability}</dd>
+                <dd className="font-semibold text-brand-950">{farm.waterAvailability || "Not set"}</dd>
               </div>
               {/* Soil type row */}
               <div className="flex items-center justify-between">
                 {/* Label */}
                 <dt className="text-ink-muted">Soil Type</dt>
                 {/* Value */}
-                <dd className="font-semibold text-brand-950">{farm.soilType}</dd>
-              </div>
-              {/* Growth stage row (sample value) */}
-              <div className="flex items-center justify-between">
-                {/* Label */}
-                <dt className="text-ink-muted">Growth Stage</dt>
-                {/* Value */}
-                <dd className="font-semibold text-brand-950">Vegetative</dd>
+                <dd className="font-semibold text-brand-950">{farm.soilType || "Not set"}</dd>
               </div>
             </dl>
 
@@ -430,53 +430,6 @@ export default function Dashboard() {
             </div>
           </Card>
 
-          {/* Farm tasks card */}
-          <Card className="mt-6">
-            {/* Card header */}
-            <CardHeader
-              // Title
-              title="Farm Tasks"
-              // Description
-              description="Sample checklist for demonstration."
-              // Icon
-              icon={ClipboardList}
-            />
-
-            {/* Task list */}
-            <ul className="space-y-2.5">
-              {/* Map the sample tasks into rows */}
-              {FARM_TASKS.map((task) => (
-                // Single task row
-                <li key={task.id} className="flex items-start gap-2.5">
-                  {/* Checkbox reflecting the sample completion state */}
-                  <input
-                    // Checkbox type
-                    type="checkbox"
-                    // Checked state from the sample data
-                    defaultChecked={task.done}
-                    // Accessible label
-                    aria-label={task.label}
-                    // Green accent and larger tap area
-                    className="mt-0.5 h-4 w-4 rounded border-line accent-brand-600"
-                    // Disabled because this list is static sample data
-                    disabled
-                  />
-                  {/* Task label with muted styling when done */}
-                  <span
-                    // Strike through completed sample tasks
-                    className={
-                      task.done
-                        ? "text-sm leading-relaxed text-ink-muted line-through"
-                        : "text-sm leading-relaxed text-ink-soft"
-                    }
-                  >
-                    {/* Task text */}
-                    {task.label}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </Card>
         </div>
       </div>
     </>

@@ -98,8 +98,8 @@ export default function Footer() {
 
             {/* Academic project note */}
             <p className="mt-6 rounded-xl border border-white/10 bg-white/5 px-3.5 py-3 text-xs leading-relaxed text-brand-200/70">
-              Academic project note: KhetiGPT is a mini project prototype. All data shown in the
-              application is sample data created for demonstration purposes.
+              Academic project note: KhetiGPT combines connected backend services with curated
+              agricultural reference data. Always verify guidance with local experts.
             </p>
           </div>
         </div>
@@ -108,7 +108,7 @@ export default function Footer() {
         <div className="mt-10 border-t border-white/10 pt-6">
           {/* Copyright line */}
           <p className="text-center text-xs text-brand-200/70">
-            © {new Date().getFullYear()} KhetiGPT · Academic Mini Project · Smarter Farming.
+            Project Admin: Sumit Kumar Jha · © {new Date().getFullYear()} KhetiGPT · Smarter Farming.
             Better Decisions.
           </p>
         </div>

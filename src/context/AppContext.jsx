@@ -1,116 +1,170 @@
-// Import the React hooks needed to build and consume the context
-import { createContext, useContext, useMemo } from "react";
-// Import the localStorage-backed state hook for persistence
-import { useLocalStorage } from "../hooks/useLocalStorage";
-// Import the default demo user and farm sample data
-import { DEMO_USER, DEMO_FARM } from "../data/farmProfile";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
-// Create the context object that will hold the global app state
+import api, {
+  ENDPOINTS,
+  setAuthToken,
+  clearAuthToken,
+} from "../services/api";
+
 const AppContext = createContext(null);
 
-// Storage keys used in localStorage (declared once to avoid typos)
-const STORAGE_KEYS = {
-  // Stores the demo session flag
-  session: "khetigpt.demo.session",
-  // Stores the demo user profile
-  user: "khetigpt.demo.user",
-  // Stores the demo farm details
-  farm: "khetigpt.demo.farm",
+const EMPTY_USER = {
+  name: "",
+  email: "",
+  location: "",
+  language: "English",
+  farmSize: null,
+  farmSizeUnit: "acre",
+  soilType: "",
+  waterAvailability: "",
+  currentCrop: "",
+  season: "",
 };
 
-/**
- * AppProvider - wraps the whole app and exposes demo session state plus
- * profile/farm state. There is no real authentication yet: the values are
- * kept in localStorage purely so the demo feels continuous.
- */
+const EMPTY_FARM = {
+  farmSize: "",
+  farmUnit: "acre",
+  soilType: "",
+  currentCrop: "",
+  waterAvailability: "",
+  season: "",
+};
+
+const mapProfile = (profile = {}) => ({
+  user: {
+    ...EMPTY_USER,
+    ...profile,
+    name: profile.name || profile.fullName || "",
+    language: profile.language || profile.preferredLanguage || "English",
+  },
+  farm: {
+    ...EMPTY_FARM,
+    farmSize: profile.farmSize ?? "",
+    farmUnit: profile.farmSizeUnit || "acre",
+    soilType: profile.soilType || "",
+    currentCrop: profile.currentCrop || "",
+    waterAvailability:
+      profile.waterAvailability || profile.irrigationType || "",
+    season: profile.season || "",
+  },
+});
+
 export function AppProvider({ children }) {
-  // Persist whether a demo session is currently active
-  const [isAuthenticated, setIsAuthenticated] = useLocalStorage(STORAGE_KEYS.session, false);
-  // Persist the demo user profile (name, email, location, language)
-  const [user, setUser] = useLocalStorage(STORAGE_KEYS.user, DEMO_USER);
-  // Persist the demo farm details (size, soil, crop, water availability)
-  const [farm, setFarm] = useLocalStorage(STORAGE_KEYS.farm, DEMO_FARM);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [user, setUser] = useState(EMPTY_USER);
+  const [farm, setFarm] = useState(EMPTY_FARM);
 
-  /**
-   * loginDemo - marks the demo session as active.
-   * Accepts an optional partial profile so the login page can carry over
-   * whatever the user typed.
-   */
-  const loginDemo = (details = {}) => {
-    // Merge the supplied details into the existing profile
-    setUser((current) => ({ ...current, ...details }));
-    // Flip the session flag so protected routes open
+  const applyProfile = (profile) => {
+    const mapped = mapProfile(profile);
+    setUser(mapped.user);
+    setFarm(mapped.farm);
+    return mapped.user;
+  };
+
+  useEffect(() => {
+    api
+      .get(ENDPOINTS.PROFILE)
+      .then(({ data }) => {
+        const profile = data?.data?.user;
+        if (!profile) throw new Error("The server returned no user profile.");
+
+        applyProfile(profile);
+        setIsAuthenticated(true);
+      })
+      .catch(() => {
+        clearAuthToken();
+        setIsAuthenticated(false);
+        setUser(EMPTY_USER);
+        setFarm(EMPTY_FARM);
+      })
+      .finally(() => setAuthLoading(false));
+
+    return undefined;
+  }, []);
+
+  useEffect(() => {
+    const handleUnauthorised = () => {
+      setIsAuthenticated(false);
+      setUser(EMPTY_USER);
+      setFarm(EMPTY_FARM);
+    };
+
+    window.addEventListener("khetigpt:unauthorised", handleUnauthorised);
+    return () =>
+      window.removeEventListener("khetigpt:unauthorised", handleUnauthorised);
+  }, []);
+
+  const login = async (details = {}, remember = false) => {
+    const response = await api.post(ENDPOINTS.LOGIN, {
+      email: details.email,
+      password: details.password,
+    });
+    const { token, user: profile } = response.data.data;
+
+    setAuthToken(token, remember);
+    applyProfile(profile);
     setIsAuthenticated(true);
+    return profile;
   };
 
-  /**
-   * registerDemo - creates a demo account from the registration form.
-   * The password is intentionally NOT stored anywhere.
-   */
-  const registerDemo = (details = {}) => {
-    // Merge registration values with the demo defaults
-    setUser((current) => ({ ...current, ...details }));
-    // Update the farm details that were collected during registration
-    setFarm((current) => ({
-      ...current,
-      // Only overwrite farm values that were actually provided
-      ...(details.farmSize ? { farmSize: details.farmSize } : {}),
-      ...(details.soilType ? { soilType: details.soilType } : {}),
-      ...(details.waterAvailability ? { waterAvailability: details.waterAvailability } : {}),
-    }));
-    // Activate the demo session
+  const register = async (details = {}, remember = false) => {
+    const response = await api.post(ENDPOINTS.REGISTER, {
+      ...details,
+      name: details.name || details.fullName,
+    });
+    const { token, user: profile } = response.data.data;
+
+    setAuthToken(token, remember);
+    applyProfile(profile);
     setIsAuthenticated(true);
+    return profile;
   };
 
-  /** logout - clears the demo session (profile data stays for the next demo) */
-  const logout = () => {
-    // Simply end the session; no server call is required
-    setIsAuthenticated(false);
+  const logout = async () => {
+    try {
+      if (getAuthToken()) await api.post(ENDPOINTS.LOGOUT);
+    } finally {
+      clearAuthToken();
+      setIsAuthenticated(false);
+      setUser(EMPTY_USER);
+      setFarm(EMPTY_FARM);
+    }
   };
 
-  /** updateProfile - patches the personal information locally */
-  const updateProfile = (patch) => {
-    // Merge the patch into the current user object
-    setUser((current) => ({ ...current, ...patch }));
+  const updateProfile = async (patch) => {
+    const response = await api.put(ENDPOINTS.PROFILE, patch);
+    const profile = response.data?.data?.user;
+    if (!profile) throw new Error("The server returned no updated profile.");
+
+    applyProfile(profile);
+    return profile;
   };
 
-  /** updateFarm - patches the farm information locally */
   const updateFarm = (patch) => {
-    // Merge the patch into the current farm object
     setFarm((current) => ({ ...current, ...patch }));
   };
 
-  // Memoise the context value so it only changes when the state changes
   const value = useMemo(
     () => ({
-      // Demo session flag and actions
       isAuthenticated,
-      loginDemo,
-      registerDemo,
+      authLoading,
+      login,
+      register,
       logout,
-      // Profile and farm data plus their local update functions
       user,
       farm,
       updateProfile,
       updateFarm,
     }),
-    // Recreate the value whenever any of these change
-    [isAuthenticated, user, farm]
+    [isAuthenticated, authLoading, user, farm]
   );
 
-  // Provide the value to every child component in the tree
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
 
-/**
- * useApp - convenience hook for consuming the app context.
- * Throws a clear error if used outside the provider.
- */
 export function useApp() {
-  // Read the nearest context value
   const context = useContext(AppContext);
-  // Guard against incorrect usage high in the tree
   if (!context) throw new Error("useApp must be used inside <AppProvider>");
-  // Return the context value to the caller
   return context;
 }

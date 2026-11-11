@@ -2,7 +2,7 @@
 import { Loader2 } from "lucide-react";
 
 /**
- * LoadingState - inline loading indicator used while mock data "loads".
+ * LoadingState - inline loading indicator used while backend data loads.
  * Keeps layouts stable instead of flashing empty content.
  */
 export default function LoadingState({ label = "Loading sample data…", rows = 3 }) {

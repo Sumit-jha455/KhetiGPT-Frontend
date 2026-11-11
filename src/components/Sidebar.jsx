@@ -4,11 +4,11 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { LogOut } from "lucide-react";
 // Import the logo component for the sidebar brand block
 import Logo from "./Logo";
-// Import the navigation items and sample notifications data
+// Import the navigation items
 import { DASHBOARD_NAV } from "../data/navigation";
 // Import the global app context hook
 import { useApp } from "../context/AppContext";
-// Import the Badge component for the demo mode label
+// Import the Badge component for the connection status label
 import Badge from "./Badge";
 
 /**
@@ -16,16 +16,14 @@ import Badge from "./Badge";
  * It is hidden below the lg breakpoint where the mobile bottom bar takes over.
  */
 export default function Sidebar() {
-  // Get the demo user, logout action and router navigate function
+  // Get the authenticated user, logout action and router navigate function
   const { user, logout } = useApp();
-  // useNavigate lets the sidebar redirect after ending the demo session
+  // useNavigate redirects after ending the authenticated session
   const navigate = useNavigate();
 
-  /** handleLogout ends the demo session and returns to the landing page */
+  /** End the authenticated session and return to the landing page. */
   const handleLogout = () => {
-    // Clear the demo session flag
     logout();
-    // Send the user back to the public landing page
     navigate("/");
   };
 
@@ -77,17 +75,15 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* Bottom area: demo mode label and the logged in user */}
+      {/* Bottom area: connection status and the logged in user */}
       <div className="border-t border-white/10 px-4 py-4">
-        {/* Demo mode badge makes the project status obvious */}
         <Badge tone="brand" className="border-brand-700 bg-brand-900 text-brand-200">
-          Demo Mode
+          Connected
         </Badge>
 
-        {/* Logged in demo user information */}
-        <p className="mt-3 truncate text-sm font-semibold text-white">{user?.name}</p>
-        {/* Location of the demo farm */}
-        <p className="truncate text-xs text-brand-300/80">{user?.location}</p>
+        {/* Logged in user information */}
+        <p className="mt-3 truncate text-sm font-semibold text-white">{user?.name || "Account"}</p>
+        <p className="truncate text-xs text-brand-300/80">{user?.location || "Location not set"}</p>
 
         {/* Logout button ends the demo session */}
         <button
@@ -96,7 +92,7 @@ export default function Sidebar() {
           // Trigger the logout handler
           onClick={handleLogout}
           // Accessible label
-          aria-label="End demo session"
+          aria-label="Log out"
           // Full width ghost button with white text on the dark background
           className="mt-3 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-brand-100 transition-colors hover:bg-white/10 hover:text-white"
         >

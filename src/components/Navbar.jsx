@@ -103,13 +103,13 @@ export default function Navbar() {
 
         {/* Desktop action buttons */}
         <div className="hidden items-center gap-2.5 md:flex">
-          {/* Login navigates to the demo login page */}
-          <Button to="/login" variant="outline" size="sm" title="Open the demo login page">
+          {/* Login navigates to the account login page */}
+          <Button to="/login" variant="outline" size="sm" title="Open the login page">
             {/* Button label */}
             Login
           </Button>
-          {/* Get Started navigates to the demo registration page */}
-          <Button to="/register" size="sm" title="Create a demo account">
+          {/* Get Started navigates to the registration page */}
+          <Button to="/register" size="sm" title="Create an account">
             {/* Button label */}
             Get Started
             {/* Small arrow icon inside the button */}

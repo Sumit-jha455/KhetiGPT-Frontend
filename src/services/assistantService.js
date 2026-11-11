@@ -1,25 +1,23 @@
-/**
- * assistantService.js
- * Mock service layer for the AI Assistant page. It simulates an API round
- * trip (short delay) and returns a reply produced by the local rule engine.
- * The real Gemini integration will replace the body of sendMessage() later.
- */
+import api, { ENDPOINTS } from "./api";
 
-// Import the local keyword based reply builder
-import { buildAssistantReply, ASSISTANT_GREETING } from "../data/mockAssistant";
-// Import the shared delay helper so the UI can show a typing indicator
-import { simulateNetworkDelay } from "./api";
+const getData = (response) => response.data?.data ?? {};
 
-/**
- * sendAssistantMessage - accepts a user message and resolves with an
- * assistant message object after a simulated delay.
- */
 export async function sendAssistantMessage(message) {
-  // Wait briefly to imitate network + model latency
-  await simulateNetworkDelay(700);
-  // Return the locally generated reply (no external API call)
-  return buildAssistantReply(message);
+  const response = await api.post(ENDPOINTS.ASSISTANT, { message });
+  return getData(response);
 }
 
-// Export the greeting so the page can seed the conversation
-export { ASSISTANT_GREETING };
+export async function fetchAssistantHistory() {
+  const response = await api.get(ENDPOINTS.ASSISTANT_HISTORY);
+  return getData(response);
+}
+
+export async function clearAssistantHistory() {
+  const response = await api.delete(ENDPOINTS.ASSISTANT_HISTORY);
+  return getData(response);
+}
+
+export async function fetchAssistantMeta() {
+  const response = await api.get(ENDPOINTS.ASSISTANT_META);
+  return getData(response);
+}

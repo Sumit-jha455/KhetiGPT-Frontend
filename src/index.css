@@ -97,7 +97,7 @@
   scrollbar-color: var(--color-brand-200) transparent;
 }
 
-/* Custom keyframe used by the mock AI "thinking" indicator only */
+/* Custom keyframe used by the AI assistant typing indicator */
 @keyframes pulse-dot {
   /* Dot fades down slightly */
   0%,
@@ -112,7 +112,7 @@
   }
 }
 
-/* Class applied to the three bouncing dots while the demo AI replies */
+/* Class applied to the three bouncing dots while the assistant replies */
 .typing-dot {
   animation: pulse-dot 1s infinite ease-in-out;
 }

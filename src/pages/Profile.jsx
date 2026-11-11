@@ -1,7 +1,7 @@
 // Import React hooks for local edit state
 import { useState } from "react";
 // Import the lucide icons used on this page
-import { UserRound, MapPin, Ruler, Sprout, Layers, Droplets, Pencil, Save, X, Mail } from "lucide-react";
+import { UserRound, Ruler, Sprout, Layers, Droplets, Pencil, Save, X, Mail } from "lucide-react";
 // Import the reusable components
 import Card, { CardHeader } from "../components/Card";
 import Input from "../components/Input";
@@ -10,6 +10,7 @@ import Button from "../components/Button";
 import Badge from "../components/Badge";
 import Disclaimer from "../components/Disclaimer";
 import StatCard from "../components/StatCard";
+import LocationSelector from "../components/LocationSelector";
 // Import the option lists used by the editable dropdowns
 import { SOIL_TYPES, WATER_LEVELS, SEASONS } from "../data/mockCrops";
 // Import the global app context for the profile and farm data
@@ -19,15 +20,15 @@ import { useDocumentTitle } from "../hooks/useDocumentTitle";
 
 /**
  * Profile - personal and farm information screen.
- * The Edit Profile button enables a local editing state; saving updates the
- * context (and localStorage) only. There is no server request.
+ * The Edit Profile button enables a local editing state; saving persists the
+ * changes through the authenticated backend profile endpoint.
  */
 export default function Profile() {
   // Set the browser tab title for this page
   useDocumentTitle("My Profile");
 
   // Read the profile, farm data and update functions from context
-  const { user, farm, updateProfile, updateFarm } = useApp();
+  const { user, farm, updateProfile } = useApp();
 
   // Local editing flag: read-only by default
   const [isEditing, setIsEditing] = useState(false);
@@ -37,6 +38,8 @@ export default function Profile() {
   const [farmDraft, setFarmDraft] = useState(farm);
   // Message shown after a successful save
   const [savedMessage, setSavedMessage] = useState("");
+  const [saveError, setSaveError] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
   /** Enters edit mode and resets the drafts to the current values */
   const handleEdit = () => {
@@ -48,6 +51,7 @@ export default function Profile() {
     setIsEditing(true);
     // Clear any previous message
     setSavedMessage("");
+    setSaveError("");
   };
 
   /** Cancels editing and restores the saved values */
@@ -60,40 +64,36 @@ export default function Profile() {
   };
 
   /** Saves the drafts into the app context */
-  const handleSave = (event) => {
+  const handleSave = async (event) => {
     // Prevent the default form submission
     event.preventDefault();
+    setIsSaving(true);
+    setSavedMessage("");
+    setSaveError("");
 
-    // Update the personal information in context
-    updateProfile({
-      // Name
-      name: profileDraft.name,
-      // Email
-      email: profileDraft.email,
-      // Location
-      location: profileDraft.location,
-      // Preferred language
-      language: profileDraft.language,
-    });
+    try {
+      await updateProfile({
+        name: profileDraft.name,
+        location: profileDraft.location,
+        language: profileDraft.language,
+        farmSize: farmDraft.farmSize === "" ? null : Number(farmDraft.farmSize),
+        soilType: farmDraft.soilType,
+        currentCrop: farmDraft.currentCrop,
+        waterAvailability: farmDraft.waterAvailability,
+        season: farmDraft.season,
+      });
 
-    // Update the farm information in context
-    updateFarm({
-      // Farm size
-      farmSize: farmDraft.farmSize,
-      // Soil type
-      soilType: farmDraft.soilType,
-      // Current crop
-      currentCrop: farmDraft.currentCrop,
-      // Water availability
-      waterAvailability: farmDraft.waterAvailability,
-      // Season
-      season: farmDraft.season,
-    });
-
-    // Leave edit mode
-    setIsEditing(false);
-    // Show a confirmation message
-    setSavedMessage("Profile updated locally. Changes are stored in this browser only.");
+      setIsEditing(false);
+      setSavedMessage("Profile updated successfully.");
+    } catch (error) {
+      setSaveError(
+        error.response?.data?.message ||
+          error.message ||
+          "Unable to update your profile. Please try again."
+      );
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   /** Generic handler for the personal information fields */
@@ -131,8 +131,7 @@ export default function Profile() {
         </div>
         {/* Page description */}
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-muted">
-          Your personal and farm information used across the KhetiGPT modules. Editing works in
-          local demo state only.
+          Your personal and farm information used across the KhetiGPT modules.
         </p>
       </div>
 
@@ -163,11 +162,11 @@ export default function Profile() {
               {/* Badges row */}
               <div className="mt-2 flex flex-wrap gap-2">
                 {/* Location badge */}
-                <Badge tone="neutral">{user?.location}</Badge>
+                <Badge tone="neutral">{user?.location || "Location not set"}</Badge>
                 {/* Language badge */}
                 <Badge tone="brand">{user?.language}</Badge>
-                {/* Demo profile badge */}
-                <Badge tone="amber">Demo Profile</Badge>
+                {/* Profile source badge */}
+                <Badge tone="brand">Saved Profile</Badge>
               </div>
             </div>
           </div>
@@ -187,11 +186,15 @@ export default function Profile() {
               // Fragment holding the save and cancel buttons
               <>
                 {/* Save button submits the form */}
-                <Button type="submit" form="profile-form" title="Save changes locally">
+                <Button
+                  type="submit"
+                  form="profile-form"
+                  title="Save changes"
+                  disabled={isSaving}
+                >
                   {/* Save icon */}
                   <Save size={16} aria-hidden="true" />
-                  {/* Button label */}
-                  Save Changes
+                  {isSaving ? "Saving..." : "Save Changes"}
                 </Button>
                 {/* Cancel button discards the edits */}
                 <Button variant="outline" onClick={handleCancel} title="Discard changes">
@@ -211,6 +214,14 @@ export default function Profile() {
           <p className="mt-4 rounded-xl border border-brand-200 bg-brand-50 px-3.5 py-2.5 text-xs font-medium leading-relaxed text-brand-800">
             {/* Message text */}
             {savedMessage}
+          </p>
+        ) : null}
+        {saveError ? (
+          <p
+            role="alert"
+            className="mt-4 rounded-xl border border-red-100 bg-red-50 px-3.5 py-2.5 text-xs leading-relaxed text-red-700"
+          >
+            {saveError}
           </p>
         ) : null}
       </Card>
@@ -304,28 +315,20 @@ export default function Profile() {
                 // Handler
                 onChange={handleProfileChange}
                 // Read-only when not editing
-                readOnly={!isEditing}
+                readOnly
                 // Helper text
-                hint="Used as the demo account identifier."
+                hint="Used as the account identifier."
               />
             </div>
 
             {/* Location field */}
             <div className="mt-4">
               {/* Location input with the pin icon */}
-              <Input
-                // Label
-                label="Location"
-                // Name
+              <LocationSelector
                 name="location"
-                // Icon
-                icon={MapPin}
-                // Value
                 value={isEditing ? profileDraft.location : user.location}
-                // Handler
                 onChange={handleProfileChange}
-                // Read-only when not editing
-                readOnly={!isEditing}
+                disabled={!isEditing}
               />
             </div>
 
@@ -339,14 +342,15 @@ export default function Profile() {
                 name="language"
                 // Options
                 options={["English", "Hindi"]}
+                placeholder="Not set"
                 // Value
-                value={isEditing ? profileDraft.language : user.language}
+                value={isEditing ? profileDraft.language : (user.language || "")}
                 // Handler
                 onChange={handleProfileChange}
                 // Disabled when not editing
                 disabled={!isEditing}
                 // Helper text
-                hint="Interface language support is planned for a later phase."
+                hint="Saved to your account and used as the preferred language."
               />
             </div>
           </Card>
@@ -370,17 +374,17 @@ export default function Profile() {
               // Name
               name="farmSize"
               // Numeric input
-              type="number"
+              type={isEditing ? "number" : "text"}
               // Icon
               icon={Ruler}
               // Value
-              value={isEditing ? farmDraft.farmSize : farm.farmSize}
+              value={isEditing ? farmDraft.farmSize : (farm.farmSize === "" || farm.farmSize == null ? "Not set" : farm.farmSize)}
               // Handler
               onChange={handleFarmChange}
               // Read-only when not editing
               readOnly={!isEditing}
               // Helper text
-              hint="Total cultivable area of the demo farm."
+              hint="Total cultivable area of your farm."
             />
 
             {/* Soil type dropdown */}
@@ -394,7 +398,8 @@ export default function Profile() {
                 // Options
                 options={SOIL_TYPES}
                 // Value
-                value={isEditing ? farmDraft.soilType : farm.soilType}
+                placeholder="Not set"
+                value={isEditing ? farmDraft.soilType : (farm.soilType || "")}
                 // Handler
                 onChange={handleFarmChange}
                 // Disabled when not editing
@@ -413,7 +418,7 @@ export default function Profile() {
                 // Icon
                 icon={Sprout}
                 // Value
-                value={isEditing ? farmDraft.currentCrop : farm.currentCrop}
+                value={isEditing ? farmDraft.currentCrop : (farm.currentCrop || "Not set")}
                 // Handler
                 onChange={handleFarmChange}
                 // Read-only when not editing
@@ -432,7 +437,8 @@ export default function Profile() {
                 // Options
                 options={WATER_LEVELS}
                 // Value
-                value={isEditing ? farmDraft.waterAvailability : farm.waterAvailability}
+                placeholder="Not set"
+                value={isEditing ? farmDraft.waterAvailability : (farm.waterAvailability || "")}
                 // Handler
                 onChange={handleFarmChange}
                 // Disabled when not editing
@@ -451,7 +457,8 @@ export default function Profile() {
                 // Options
                 options={SEASONS}
                 // Value
-                value={isEditing ? farmDraft.season : farm.season}
+                placeholder="Not set"
+                value={isEditing ? farmDraft.season : (farm.season || "")}
                 // Handler
                 onChange={handleFarmChange}
                 // Disabled when not editing
@@ -466,19 +473,23 @@ export default function Profile() {
         {/* Save button for mobile users at the bottom of the form */}
         {isEditing ? (
           // Full width save button
-          <Button type="submit" fullWidth className="mt-6" title="Save changes locally">
+          <Button
+            type="submit"
+            fullWidth
+            className="mt-6"
+            title="Save changes"
+            disabled={isSaving}
+          >
             {/* Save icon */}
             <Save size={16} aria-hidden="true" />
-            {/* Button label */}
-            Save Changes
+            {isSaving ? "Saving..." : "Save Changes"}
           </Button>
         ) : null}
       </form>
 
-      {/* Local state disclaimer */}
       <Disclaimer
         // Notice text
-        text="Editing works in local demo state only. Changes are saved to this browser's localStorage and are not sent to any server. Backend profile storage is planned for a later phase."
+        text="Profile changes are saved securely to your KhetiGPT account."
         // Blue informational tone
         tone="sky"
         // Spacing above

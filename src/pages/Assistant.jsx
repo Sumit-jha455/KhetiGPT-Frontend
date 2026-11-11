@@ -5,11 +5,15 @@ import { MessageSquareText, Send, Sparkles, RotateCcw, UserRound, Bot } from "lu
 // Import the reusable card and disclaimer components
 import Card, { CardHeader } from "../components/Card";
 import Disclaimer from "../components/Disclaimer";
-// Import the mock assistant data and service
-import { ASSISTANT_GREETING, SUGGESTED_QUESTIONS } from "../data/mockAssistant";
-// Import the mock service that simulates the future API call
-import { sendAssistantMessage } from "../services/assistantService";
-// Import the time formatter for the initial greeting
+// Suggested prompts remain local UI content; replies come from the backend.
+import { SUGGESTED_QUESTIONS } from "../data/mockAssistant";
+import {
+  sendAssistantMessage,
+  fetchAssistantHistory,
+  clearAssistantHistory,
+  fetchAssistantMeta,
+} from "../services/assistantService";
+// Import the time formatter for chat timestamps
 import { formatTime } from "../utils/formatters";
 // Import the page title hook
 import { useDocumentTitle } from "../hooks/useDocumentTitle";
@@ -18,30 +22,27 @@ import { cn } from "../utils/cn";
 
 /**
  * Assistant - the chat interface of KhetiGPT.
- * Runs entirely on a local keyword based response engine, clearly labelled
- * as "Demo AI Mode". No Gemini API call is made in this phase.
+ * Uses the authenticated backend assistant, which calls Groq and persists
+ * conversation history for the current farmer.
  */
 export default function Assistant() {
   // Set the browser tab title for this page
   useDocumentTitle("AI Assistant");
 
-  // Conversation state: an array of message objects
-  const [messages, setMessages] = useState(() => [
-    // Seed the conversation with the assistant greeting
-    {
-      // Copy the greeting content
-      ...ASSISTANT_GREETING,
-      // Attach the current time to the first message
-      time: formatTime(),
-    },
-  ]);
+  const [messages, setMessages] = useState([]);
 
   // Current value of the chat input
   const [input, setInput] = useState("");
-  // Flag that shows the typing indicator while the mock reply is delayed
+  // Flag that shows the typing indicator while the backend request is pending
   const [isTyping, setIsTyping] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [isClearing, setIsClearing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [assistantMeta, setAssistantMeta] = useState(null);
   // Ref used to scroll the conversation to the bottom automatically
   const scrollRef = useRef(null);
+  const formatMessageTime = (value) =>
+    formatTime(value ? new Date(value) : new Date());
 
   // Scroll to the newest message whenever messages or the typing flag change
   useEffect(() => {
@@ -53,20 +54,60 @@ export default function Assistant() {
     // Re-run on every new message and typing change
   }, [messages, isTyping]);
 
+  useEffect(() => {
+    let active = true;
+
+    const loadAssistant = async () => {
+      try {
+        const [historyData, metaData] = await Promise.all([
+          fetchAssistantHistory(),
+          fetchAssistantMeta(),
+        ]);
+        if (!active) return;
+
+        const history = historyData.conversation?.messages ?? [];
+        setMessages(
+          history.map((message) => ({
+            id: message.id,
+            sender: message.role === "user" ? "user" : "ai",
+            text: message.content,
+            time: formatMessageTime(message.timestamp),
+          }))
+        );
+        setAssistantMeta(metaData);
+      } catch (error) {
+        if (active) {
+          setErrorMessage(
+            error.response?.data?.message ||
+              error.message ||
+              "Unable to load your assistant history."
+          );
+        }
+      } finally {
+        if (active) setIsLoadingHistory(false);
+      }
+    };
+
+    loadAssistant();
+    return () => {
+      active = false;
+    };
+  }, []);
+
   /** Appends a message object to the conversation */
   const addMessage = (message) => {
     // Update the state with the new message added to the end
     setMessages((current) => [...current, message]);
   };
 
-  /** Sends the user question and receives the mock assistant reply */
+  /** Sends the user question and receives the backend assistant reply */
   const handleSend = async (question) => {
     // Normalise the question and ignore empty submissions
     const text = String(question || input).trim();
     // Do nothing when there is nothing to send
     if (!text || isTyping) return;
 
-    // Add the user message to the conversation
+    setErrorMessage("");
     addMessage({
       // Sender identifier
       sender: "user",
@@ -78,16 +119,26 @@ export default function Assistant() {
 
     // Clear the input field for the next question
     setInput("");
-    // Show the typing indicator while waiting for the mock reply
+    // Show the typing indicator while waiting for the backend reply
     setIsTyping(true);
 
-    // Request the mock reply from the local service
-    const reply = await sendAssistantMessage(text);
-
-    // Add the assistant reply to the conversation
-    addMessage(reply);
-    // Hide the typing indicator
-    setIsTyping(false);
+    try {
+      const response = await sendAssistantMessage(text);
+      addMessage({
+        id: response.conversation?.messages?.at(-1)?.id,
+        sender: "ai",
+        text: response.reply,
+        time: formatMessageTime(response.repliedAt),
+      });
+    } catch (error) {
+      setErrorMessage(
+        error.response?.data?.message ||
+          error.message ||
+          "The assistant could not answer right now. Please try again."
+      );
+    } finally {
+      setIsTyping(false);
+    }
   };
 
   /** Handles the form submission from the chat input */
@@ -98,10 +149,23 @@ export default function Assistant() {
     handleSend(input);
   };
 
-  /** Resets the conversation back to the greeting message */
-  const handleReset = () => {
-    // Restore the original single message conversation
-    setMessages([{ ...ASSISTANT_GREETING, time: formatTime() }]);
+  /** Clears the persisted conversation and refreshes the empty UI. */
+  const handleReset = async () => {
+    if (isTyping || isClearing) return;
+    setIsClearing(true);
+    setErrorMessage("");
+    try {
+      await clearAssistantHistory();
+      setMessages([]);
+    } catch (error) {
+      setErrorMessage(
+        error.response?.data?.message ||
+          error.message ||
+          "Unable to clear your assistant history."
+      );
+    } finally {
+      setIsClearing(false);
+    }
   };
 
   return (
@@ -109,7 +173,7 @@ export default function Assistant() {
     <>
       {/* Page heading block */}
       <div className="mb-6">
-        {/* Flex row with the title and the demo badge */}
+        {/* Flex row with the title and service status */}
         <div className="flex flex-wrap items-center gap-3">
           {/* Icon tile for the module */}
           <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
@@ -120,18 +184,17 @@ export default function Assistant() {
           <h1 className="font-display text-xl font-bold text-brand-950 sm:text-2xl">
             AI Farming Assistant
           </h1>
-          {/* Demo AI mode badge */}
+          {/* Backend AI mode badge */}
           <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-brand-800">
             {/* Sparkles icon */}
             <Sparkles size={12} aria-hidden="true" />
             {/* Badge label */}
-            Demo AI Mode
+            {assistantMeta?.aiConfigured ? "Live Groq AI" : "AI unavailable"}
           </span>
         </div>
         {/* Page description */}
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-muted">
-          Ask farming related questions and receive answers generated by a small local knowledge
-          base. The Gemini API integration is planned for a later phase of the project.
+          Ask farming questions and receive answers from the KhetiGPT backend assistant.
         </p>
       </div>
 
@@ -153,7 +216,9 @@ export default function Assistant() {
                 {/* Assistant name */}
                 <p className="text-sm font-semibold text-brand-950">KhetiGPT Assistant</p>
                 {/* Status line */}
-                <p className="text-xs text-ink-muted">Local demo response engine</p>
+                <p className="text-xs text-ink-muted">
+                  {assistantMeta?.model || "Backend AI assistant"}
+                </p>
               </div>
             </div>
 
@@ -167,6 +232,7 @@ export default function Assistant() {
               aria-label="Clear conversation"
               // Tooltip text
               title="Clear conversation"
+              disabled={isClearing || isTyping}
               // Ghost icon button styling
               className="flex h-9 w-9 items-center justify-center rounded-xl border border-line text-ink-muted transition-colors hover:border-brand-300 hover:text-brand-700"
             >
@@ -184,6 +250,19 @@ export default function Assistant() {
             // Scroll container styling with a slim scrollbar
             className="scrollbar-thin flex-1 space-y-4 overflow-y-auto bg-surface px-4 py-5 sm:px-5"
           >
+            {isLoadingHistory ? (
+              <p className="text-center text-sm text-ink-muted">Loading conversation...</p>
+            ) : null}
+            {!isLoadingHistory && messages.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-line bg-white px-4 py-6 text-center text-sm text-ink-muted">
+                No messages yet. Ask your first farming question below.
+              </p>
+            ) : null}
+            {errorMessage ? (
+              <p role="alert" className="rounded-xl border border-red-100 bg-red-50 px-3.5 py-2.5 text-xs leading-relaxed text-red-700">
+                {errorMessage}
+              </p>
+            ) : null}
             {/* Map every message into a bubble */}
             {messages.map((message, index) => (
               // Wrapper aligned according to the message sender
@@ -244,7 +323,7 @@ export default function Assistant() {
               </div>
             ))}
 
-            {/* Typing indicator shown while the mock reply is delayed */}
+            {/* Typing indicator shown while the backend request is pending */}
             {isTyping ? (
               // Row aligned like an assistant message
               <div className="flex gap-2.5">
@@ -288,7 +367,7 @@ export default function Assistant() {
                 Type your farming question
               </label>
               {/* Textarea-like input grows with the layout */}
-              <input
+              <textarea
                 // Field id matching the label above
                 id="chat-input"
                 // Input type
@@ -299,7 +378,7 @@ export default function Assistant() {
                 onChange={(event) => setInput(event.target.value)}
                 // Placeholder guiding the user
                 placeholder="Ask about crops, soil, fertilizer or weather…"
-                // Submit the form when Enter is pressed
+                // Submit on Enter; Shift+Enter creates a new line
                 onKeyDown={(event) => {
                   // Only send on Enter without the shift key
                   if (event.key === "Enter" && !event.shiftKey) {
@@ -311,8 +390,8 @@ export default function Assistant() {
                 }}
                 // Disabled while the assistant is replying
                 disabled={isTyping}
-                // Input styling
-                className="h-11 flex-1 rounded-xl border border-line bg-white px-4 text-sm text-ink outline-none transition-colors placeholder:text-ink-muted/70 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 disabled:opacity-60"
+                rows={1}
+                className="max-h-28 min-h-11 flex-1 resize-y rounded-xl border border-line bg-white px-4 py-3 text-sm text-ink outline-none transition-colors placeholder:text-ink-muted/70 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 disabled:opacity-60"
               />
 
               {/* Send button */}
@@ -378,7 +457,7 @@ export default function Assistant() {
             {/* Card header */}
             <CardHeader
               // Title
-              title="How this demo works"
+              title="How this works"
               // Description
               description="Transparency about the response source."
               // Icon
@@ -389,18 +468,18 @@ export default function Assistant() {
             <ul className="space-y-2.5 text-sm leading-relaxed text-ink-soft">
               {/* Point one */}
               <li>
-                Your question is matched against a small list of keywords stored in the app.
+                Your question is sent securely to the KhetiGPT backend.
               </li>
               {/* Point two */}
-              <li>The matching rule returns a prepared sample answer written for this project.</li>
+              <li>The backend sends it to Groq with the supported farming context.</li>
               {/* Point three */}
-              <li>No request leaves your browser and no API key is used.</li>
+              <li>Your API key remains on the backend and is never exposed in the browser.</li>
             </ul>
 
             {/* Disclaimer under the list */}
             <Disclaimer
               // Notice text
-              text="Demo AI Mode: responses are sample content for academic demonstration only and must not be treated as agricultural advice."
+              text="AI responses are general information only. Verify important decisions with a qualified local agriculture professional."
               // Bottom margin is not needed inside this card
               className="mt-4"
             />

@@ -1,6 +1,6 @@
 // React Router components used to build the application routing tree
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
-// Global application state (demo auth + demo farmer profile)
+// Global authentication and farmer profile state
 import { AppProvider } from "./context/AppContext";
 // Layouts wrap groups of routes with shared chrome (nav / sidebar / footer)
 import PublicLayout from "./layouts/PublicLayout";
@@ -8,7 +8,7 @@ import AuthLayout from "./layouts/AuthLayout";
 import DashboardLayout from "./layouts/DashboardLayout";
 // Landing / marketing page shown at "/"
 import Landing from "./pages/Landing";
-// Demo authentication pages (no real backend yet)
+// Authentication pages
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 // Authenticated application modules
@@ -20,7 +20,7 @@ import Fertilizer from "./pages/Fertilizer";
 import Schemes from "./pages/Schemes";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
-// Guard that keeps demo-only pages behind the demo session
+// Guard that keeps application pages behind the authenticated session
 import ProtectedRoute from "./components/ProtectedRoute";
 // Friendly fallback for unknown URLs (no blank screens)
 import NotFound from "./pages/NotFound";
@@ -33,7 +33,7 @@ import NotFound from "./pages/NotFound";
  */
 export default function App() {
   return (
-    // AppProvider supplies the demo user session and farm profile via context
+    // AppProvider supplies the authenticated user session and farm profile
     <AppProvider>
       {/* HashRouter keeps the URL and UI in sync without page reloads */}
       <HashRouter>
@@ -47,16 +47,16 @@ export default function App() {
 
           {/* Auth pages share a split-screen auth layout */}
           <Route element={<AuthLayout />}>
-            {/* Demo login screen */}
+            {/* Login screen */}
             <Route path="/login" element={<Login />} />
-            {/* Demo registration screen */}
+            {/* Registration screen */}
             <Route path="/register" element={<Register />} />
           </Route>
 
           {/* App pages share the sidebar + topbar dashboard layout */}
           <Route
             element={
-              // ProtectedRoute redirects visitors without a demo session
+              // ProtectedRoute redirects visitors without an authenticated session
               <ProtectedRoute>
                 {/* Outlet-based layout renders the matched child route */}
                 <DashboardLayout />
@@ -65,19 +65,19 @@ export default function App() {
           >
             {/* Main farmer dashboard */}
             <Route path="/dashboard" element={<Dashboard />} />
-            {/* Mock AI chat assistant */}
+            {/* AI chat assistant */}
             <Route path="/assistant" element={<Assistant />} />
-            {/* Mock weather dashboard */}
+            {/* Weather dashboard */}
             <Route path="/weather" element={<Weather />} />
-            {/* Crop recommendation form + demo result */}
+            {/* Crop recommendation form */}
             <Route path="/crop-recommendation" element={<CropRecommendation />} />
             {/* Fertilizer guidance tool */}
             <Route path="/fertilizer" element={<Fertilizer />} />
             {/* Searchable government scheme directory */}
             <Route path="/schemes" element={<Schemes />} />
-            {/* Farmer profile (editable in local demo state) */}
+            {/* Farmer profile */}
             <Route path="/profile" element={<Profile />} />
-            {/* App settings / demo preferences */}
+            {/* App settings */}
             <Route path="/settings" element={<Settings />} />
           </Route>
 

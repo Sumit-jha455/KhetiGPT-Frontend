@@ -23,12 +23,16 @@ export const validateEmail = (email) => {
 };
 
 /** Validates a password field, optionally enforcing a minimum length */
-export const validatePassword = (password, minLength = 6) => {
+export const validatePassword = (password, minLength = 8) => {
   // Password cannot be blank
   if (isEmpty(password)) return "Password is required";
   // Enforce the minimum length rule
   if (String(password).length < minLength)
     return `Password must be at least ${minLength} characters`;
+  if (!/[A-Za-z]/.test(String(password)))
+    return "Password must contain at least one letter";
+  if (!/\d/.test(String(password)))
+    return "Password must contain at least one number";
   // Valid password
   return "";
 };
