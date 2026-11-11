@@ -5,6 +5,18 @@ The application uses the backend for authentication, profile data, AI chat,
 weather, crop recommendations, fertilizer guidance, and government scheme
 reference data.
 
+## Live Demo and Deployment
+
+- **Live frontend:** [kheti-gpt-frontend.vercel.app](https://kheti-gpt-frontend.vercel.app)
+- **Backend API:** [khetigpt-backend.onrender.com](https://khetigpt-backend.onrender.com)
+- **Backend health check:** [API health](https://khetigpt-backend.onrender.com/api/health)
+- **Frontend repository:** [Sumit-jha455/KhetiGPT-Frontend](https://github.com/Sumit-jha455/KhetiGPT-Frontend)
+- **Backend repository:** [Sumit-jha455/KhetiGPT-Backend](https://github.com/Sumit-jha455/KhetiGPT-Backend)
+
+The frontend is hosted on **Vercel** and connects to the Node.js backend hosted
+on **Render**. The production frontend uses the backend API base URL configured
+through the `VITE_API_BASE_URL` environment variable.
+
 ## Features
 
 - JWT/session-cookie authentication with protected routes
@@ -21,6 +33,7 @@ reference data.
 
 - React 19
 - Vite
+- JavaScript
 - React Router with `HashRouter`
 - Tailwind CSS v4
 - Axios
@@ -61,6 +74,10 @@ VITE_API_BASE_URL=http://localhost:5000/api
 If omitted, the Axios client defaults to `http://localhost:5000/api`.
 Requests include credentials and use the token stored by the authentication
 flow in session storage, or local storage when Remember Me is selected.
+
+For the deployed frontend, configure the same variable in Vercel using the
+production backend API URL. Environment variables beginning with `VITE_` are
+embedded during the frontend build, so redeploy after changing them.
 
 ## Available modules
 
